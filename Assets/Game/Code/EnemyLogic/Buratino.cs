@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+[RequireComponent(typeof(Rigidbody2D))]
 public class Buratino : MonoBehaviour
 {
     [Header("Movement")]
@@ -8,11 +9,12 @@ public class Buratino : MonoBehaviour
     [SerializeField] private float moveSpeed = 2f;
     [SerializeField] private float waypointReachedDistance = 0.1f;
     [SerializeField] private bool loopPath = true;
+    [SerializeField] private float decelerationRate = 5f; // deceleration rate for smooth stopping
 
     [Header("Detection")]
-    [SerializeField] private float detectionRange = 5f; // personalize this
+    [SerializeField] private float detectionRange = 5f; 
     [SerializeField] private LayerMask playerLayer; // delete after player tag is static
-    [SerializeField] private string playerTag = "Player"; // to be deleted after player tag is static
+    [SerializeField] private string playerTag = "Player"; // delete after player tag is static
 
     [Header("Attack")]
     [SerializeField] private float attackRange = 1.5f;
@@ -25,6 +27,15 @@ public class Buratino : MonoBehaviour
     private bool isChasing = false;
     private Transform playerTransform;
     private float lastAttackTime;
+
+    private Rigidbody2D rb;
+
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody2D>();
+        // Use Dynamic body type with gravity disabled for physics-based movement - to be changed
+        rb.gravityScale = 0f;
+    }
 
     private void Start()
     {
@@ -40,16 +51,18 @@ public class Buratino : MonoBehaviour
 
     private void Update()
     {
-        // Try to detect player
         DetectPlayer();
+    }
 
+    private void FixedUpdate()
+    {
         if (isChasing && playerTransform != null)
         {
-            ChasePlayer();
+            ChasePlayerPhysics();
         }
         else
         {
-            MoveAlongPath();
+            MoveAlongPathPhysics();
         }
     }
 
@@ -60,14 +73,15 @@ public class Buratino : MonoBehaviour
 
         if (playerCollider != null && playerCollider.CompareTag(playerTag))
         {
+            Debug.Log($"playerLayer: {playerLayer.value}, Player found: {playerCollider != null}");
             isChasing = true;
             playerTransform = playerCollider.transform;
         }
         else if (isChasing && playerTransform != null)
         {
-            // Check if player is out of range
-            float distanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
-            if (distanceToPlayer > detectionRange * 1.5f) // Add some hysteresis to prevent flipping
+            // Check if player is out of range.
+            float distanceToPlayer = Vector2.Distance((Vector2)transform.position, (Vector2)playerTransform.position);
+            if (distanceToPlayer > detectionRange * 1.5f) // ensure the player is not abusing the detection by 1.5f
             {
                 isChasing = false;
                 playerTransform = null;
@@ -75,104 +89,77 @@ public class Buratino : MonoBehaviour
         }
     }
 
-    private void ChasePlayer()
+    private void ChasePlayerPhysics()
     {
         if (playerTransform == null)
+        {
+            rb.linearVelocity = Vector2.Lerp(rb.linearVelocity, Vector2.zero, Time.fixedDeltaTime * decelerationRate);
             return;
+        }
 
-        // Calculate direction to player
-        Vector2 directionToPlayer = playerTransform.position - transform.position;
+        Vector2 directionToPlayer = (Vector2)(playerTransform.position - transform.position);
         float distanceToPlayer = directionToPlayer.magnitude;
 
-        // Check if in attack range
         if (distanceToPlayer <= attackRange)
         {
-            //AttackPlayer();
+            rb.linearVelocity = Vector2.zero;
+            AttackPlayer();
         }
         else
         {
-            // Move towards player
-            transform.position = Vector2.MoveTowards(
-                transform.position,
-                playerTransform.position,
-                moveSpeed * Time.deltaTime
-            );
+            directionToPlayer.Normalize();
+            rb.linearVelocity = directionToPlayer * moveSpeed;
         }
     }
 
-    // apply damage to player on collision, to be uncommented when player health is implemented
-
-
-    //private void AttackPlayer()
-    //{
-    //    // Check cooldown
-    //    if (Time.time >= lastAttackTime + attackCooldown)
-    //    {
-    //        // Perform attack
-    //        Debug.Log("Buratino attacks player!");
-
-    //        // Deal damage to player
-    //        if (playerTransform != null)
-    //        {
-    //            var playerHealth = playerTransform.GetComponent<PlayerHealth>();
-    //            if (playerHealth != null)
-    //            {
-    //                playerHealth.TakeDamage(damageAmount);
-    //            }
-    //        }
-
-    //        // Update attack time
-    //        lastAttackTime = Time.time;
-    //    }
-    //}
-
-    private void MoveAlongPath()
+    private void MoveAlongPathPhysics()
     {
         if (waypoints == null || waypoints.Count == 0)
+        {
+            rb.linearVelocity = Vector2.zero;
             return;
+        }
 
-        // Get current target waypoint
         Transform targetWaypoint = waypoints[currentWaypointIndex];
+        Vector2 direction = (Vector2)(targetWaypoint.position - transform.position);
+        float distanceToWaypoint = direction.magnitude;
 
-        // Calculate direction to the target
-        Vector2 directionToWaypoint = targetWaypoint.position - transform.position;
-        float distanceToWaypoint = directionToWaypoint.magnitude;
-
-        // Flip sprite based on movement direction
-        if (directionToWaypoint.x < 0)
-        {
-            transform.localScale = new Vector2(-Mathf.Abs(transform.localScale.x), transform.localScale.y);
-        }
-        else if (directionToWaypoint.x > 0)
-        {
-            transform.localScale = new Vector2(Mathf.Abs(transform.localScale.x), transform.localScale.y);
-        }
-
-        // Move towards waypoint
-        transform.position = Vector2.MoveTowards(
-            transform.position,
-            targetWaypoint.position,
-            moveSpeed * Time.deltaTime
-        );
-
-        // Check if waypoint reached
         if (distanceToWaypoint <= waypointReachedDistance)
         {
             SelectNextWaypoint();
+            targetWaypoint = waypoints[currentWaypointIndex];
+            direction = (Vector2)(targetWaypoint.position - transform.position);
         }
+        direction.Normalize();
+        rb.linearVelocity = direction * moveSpeed;
     }
 
+    private void AttackPlayer()
+    {
+        if (Time.time >= lastAttackTime + attackCooldown)
+        {
+            Debug.Log("Buratino attacks player!");
+            // Deal damage to player when player health is implemented.
+            
+            // var playerHealth = playerTransform.GetComponent<PlayerHealth>();
+            // if (playerHealth != null)
+            // {
+            //     playerHealth.TakeDamage(damageAmount);
+            // }
+            lastAttackTime = Time.time;
+        }
+    }
 
     private void SelectNextWaypoint()
     {
         if (loopPath)
         {
-            // Simple loop around all waypoints
+            // Loop around all waypoints
             currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count;
         }
         else
         {
-            // Ping-pong between start and end
+            // Ping-pong between first and last waypoints
             if (movingForward)
             {
                 currentWaypointIndex++;
@@ -195,13 +182,35 @@ public class Buratino : MonoBehaviour
     // Visual debugging
     private void OnDrawGizmosSelected()
     {
-        // Detection - to be adjusted
+        // Detection
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
-        // Attack - to be adjusted
+        // Attack 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
 
+        // Waypoints
+        if (waypoints != null && waypoints.Count > 0)
+        {
+            Gizmos.color = Color.cyan;
+            for (int i = 0; i < waypoints.Count; i++)
+            {
+                if (waypoints[i] != null)
+                {
+                    Vector3 pos = waypoints[i].position;
+                    Gizmos.DrawSphere(pos, 0.2f);
+
+                    if (i < waypoints.Count - 1 && waypoints[i + 1] != null)
+                    {
+                        Gizmos.DrawLine(pos, waypoints[i + 1].position);
+                    }
+                    else if (loopPath && waypoints[0] != null)
+                    {
+                        Gizmos.DrawLine(pos, waypoints[0].position);
+                    }
+                }
+            }
+        }
     }
 }

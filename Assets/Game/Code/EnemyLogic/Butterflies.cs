@@ -1,20 +1,32 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+[RequireComponent(typeof(Rigidbody2D))]
 public class Butterflies : MonoBehaviour
 {
     [Header("Movement")]
-    [SerializeField] private List<Transform> waypoints; // points to move between
+    [SerializeField] private List<Transform> waypoints;
     [SerializeField] private float moveSpeed = 2f;
-    [SerializeField] private float waypointReachedDistance = 0.1f; // Here for test purpose, delete later
-    [SerializeField] private bool loopPath = true; 
+    [SerializeField] private float waypointReachedDistance = 0.1f; // for test purpose
+    [SerializeField] private bool loopPath = true;
+
+    [Header("Detection")]
+    [SerializeField] private LayerMask playerLayer; // delete after player tag is static
+    [SerializeField] private string playerTag = "Player"; // delete after player tag is static
 
     [Header("Damage")]
     [SerializeField] private int damageAmount = 1; // depends on enemy type
-    [SerializeField] private string playerTag = "Player"; // to be deleted after player tag is static
 
     private int currentWaypointIndex = 0;
     private bool movingForward = true;
+    private Rigidbody2D rb;
+
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody2D>();
+        // Use Dynamic body type with gravity disabled for physics-based movement - to be changed
+        rb.gravityScale = 0f;
+    }
 
     private void Start()
     {
@@ -23,9 +35,20 @@ public class Butterflies : MonoBehaviour
         {
             Debug.LogWarning("No waypoints assigned to butterfly enemy!");
         }
+
+        // Check for Collider2D component
+        Collider2D collider = GetComponent<Collider2D>();
+        if (collider == null)
+        {
+            Debug.LogError("No Collider2D component found on Butterflies GameObject!");
+        }
+        else if (!collider.isTrigger)
+        {
+            Debug.LogError("Collider2D component is not set as Trigger on Butterflies GameObject!");
+        }
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
         MoveAlongPath();
     }
@@ -33,35 +56,33 @@ public class Butterflies : MonoBehaviour
     private void MoveAlongPath()
     {
         if (waypoints == null || waypoints.Count == 0)
+        {
+            rb.linearVelocity = Vector2.zero;
             return; // no waypoints to move to
+        }
 
-        // Get current target waypoint
         Transform targetWaypoint = waypoints[currentWaypointIndex];
+        Vector2 direction = (Vector2)(targetWaypoint.position - transform.position);
+        float distanceToWaypoint = direction.magnitude;
 
-        // Calculate direction to the target
-        Vector2 directionToWaypoint = targetWaypoint.position - transform.gameObject.transform.position;
-        float distanceToWaypoint = directionToWaypoint.magnitude;
-
-        // Move towards waypoint
-        transform.position = Vector2.MoveTowards(
-            transform.position,
-            targetWaypoint.position,
-            moveSpeed * Time.deltaTime
-        );
-
-        // Check if waypoint reached
         if (distanceToWaypoint <= waypointReachedDistance)
         {
             SelectNextWaypoint();
+            // Recalculate after switching waypoint
+            targetWaypoint = waypoints[currentWaypointIndex];
+            direction = (Vector2)(targetWaypoint.position - transform.position);
         }
+
+        direction.Normalize();
+        rb.linearVelocity = direction * moveSpeed;
     }
 
-    private void SelectNextWaypoint() // not sure if this is the best way to loop
+    private void SelectNextWaypoint()
     {
         if (loopPath)
         {
-            // Simple loop around all waypoints
-            currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count; 
+            // Loop around all waypoints
+            currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count;
         }
         else
         {
@@ -84,19 +105,44 @@ public class Butterflies : MonoBehaviour
             }
         }
     }
-    // apply damage to player on collision, to be uncommented when player health is implemented
-    
-    
-    //private void OnTriggerEnter2D(Collider2D collision)
-    //{
-    //    if (collision.CompareTag(playerTag))
-    //    {
-    //        // Apply damage to player
-    //        var player = collision.GetComponent<PlayerHealth>(); // Replace with your player health component name
-    //        if (player != null)
-    //        {
-    //            player.TakeDamage(damageAmount);
-    //        }
-    //    }
-    //}
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.CompareTag(playerTag))
+        {
+            Debug.Log("Butterflies deal damage to player!");
+                // Uncomment when player health is implemented:
+                // var player = collision.GetComponent<PlayerHealth>();
+                // if (player != null)
+                // {
+                //     player.TakeDamage(damageAmount);
+                // }
+        }
+    }
+
+    // Visual debugging for waypoints
+    private void OnDrawGizmosSelected()
+    {
+        if (waypoints != null && waypoints.Count > 0)
+        {
+            Gizmos.color = Color.cyan;
+            for (int i = 0; i < waypoints.Count; i++)
+            {
+                if (waypoints[i] != null)
+                {
+                    Vector3 pos = waypoints[i].position;
+                    Gizmos.DrawSphere(pos, 0.2f);
+
+                    if (i < waypoints.Count - 1 && waypoints[i + 1] != null)
+                    {
+                        Gizmos.DrawLine(pos, waypoints[i + 1].position);
+                    }
+                    else if (loopPath && waypoints[0] != null)
+                    {
+                        Gizmos.DrawLine(pos, waypoints[0].position);
+                    }
+                }
+            }
+        }
+    }
 }
