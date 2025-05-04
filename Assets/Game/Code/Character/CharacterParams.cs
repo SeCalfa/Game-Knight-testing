@@ -26,5 +26,8 @@ namespace Game.Code.Character
         public float dashSpeed;
         public float dashDuration;
         public float dashResetTime;
+        
+        [Header("Slide")]
+        public float wallSlideSpeed;
     }
 }

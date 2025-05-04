@@ -7,7 +7,9 @@ namespace Game.Code.Character
     {
         [SerializeField] private Animator animator;
         [SerializeField] private Transform groundPoint;
+        [SerializeField] private Transform wallSlidePoint;
         [SerializeField] private LayerMask whatIsGround;
+        [SerializeField] private LayerMask whatIsWall;
         [Space]
         [SerializeField] private CharacterParams characterParams;
         
@@ -17,9 +19,9 @@ namespace Game.Code.Character
         private CharacterInput characterInput;
         private InputData inputData;
 
-        private bool isOnGround;
-        private bool wasInAir;
-        private bool isDashing;
+        private bool isOnGround, isOnWall;
+        private bool wasInAir, wasSliding;
+        private bool isDashing, isSliding;
         private float dashDuration;
         private int jumpsAmount;
         private Vector2 dashDirection;
@@ -33,10 +35,13 @@ namespace Game.Code.Character
         private static readonly int JumpReset = Animator.StringToHash("JumpReset");
         private static readonly int DashStart = Animator.StringToHash("DashStart");
         private static readonly int DashEnd = Animator.StringToHash("DashEnd");
+        private static readonly int SlideStart = Animator.StringToHash("SlideStart");
+        private static readonly int SlideEnd = Animator.StringToHash("SlideEnd");
 
         private bool CanJump => isOnGround && rb.linearVelocityY < 0.1f;
         private bool CanAdditionalJump => !isOnGround && jumpsAmount > 0;
         private bool CanDash => dashDuration > 0f && !isDashing && characterTimers.timeAfterDash > characterParams.dashResetTime;
+        private bool CanSlide => isOnWall && !isOnGround && Mathf.Abs(inputData.Horizontal) > 0 && rb.linearVelocityY < 0;
         private int DashDirection => transform.localScale.x < 0 ? -1 : 1;
 
         private void Awake()
@@ -53,18 +58,22 @@ namespace Game.Code.Character
         private void Update()
         {
             inputData = characterInput.Update();
-            
-            TimersUpdate();
+
             Jump();
             Dash();
             Dashing();
-            ApplyGravity();
+
             GroundPointCheck();
+            WallSlidePointCheck();
+            
+            TimersUpdate();
+            ApplyGravity();
         }
 
         private void FixedUpdate()
         {
             Movement();
+            Slide();
         }
 
         private void TimersUpdate()
@@ -102,14 +111,22 @@ namespace Game.Code.Character
                 return;
             }
 
-            if (CanAdditionalJump)
+            if (CanAdditionalJump || CanSlide)
             {
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0);
             }
-            
+
+            if (isSliding)
+            {
+                jumpsAmount = 2;
+            }
+            else
+            {
+                jumpsAmount -= 1;
+            }
+
             var force = characterParams.jumpForce - Mathf.Max(rb.linearVelocity.y, 0);
             rb.AddForce(Vector2.up * force, ForceMode2D.Impulse);
-            jumpsAmount -= 1;
             OnJump?.Invoke();
         }
 
@@ -142,6 +159,18 @@ namespace Game.Code.Character
             }
         }
 
+        private void Slide()
+        {
+            if (!CanSlide)
+            {
+                isSliding = false;
+                return;
+            }
+            
+            rb.linearVelocity = new Vector2(rb.linearVelocityX, -characterParams.wallSlideSpeed);
+            isSliding = true;
+        }
+
         private void ApplyGravity()
         {
             if (isDashing)
@@ -149,7 +178,22 @@ namespace Game.Code.Character
                 SetGravityScale(0);
                 return;
             }
-            
+
+            if (isSliding)
+            {
+                jumpsAmount = 2;
+                wasSliding = true;
+                SetGravityScale(characterParams.gravityScale);
+                animator.SetTrigger(SlideStart);
+                return;
+            }
+
+            if (wasSliding)
+            {
+                animator.SetTrigger(SlideEnd);
+                wasSliding = false;
+            }
+
             switch (rb.linearVelocity.y)
             {
                 // Fall
@@ -182,6 +226,12 @@ namespace Game.Code.Character
         {
             var overlapCircle = Physics2D.OverlapCircle(groundPoint.position, 0.1f, whatIsGround);
             isOnGround = overlapCircle;
+        }
+        
+        private void WallSlidePointCheck()
+        {
+            var overlapCircle = Physics2D.OverlapCircle(wallSlidePoint.position, 0.1f, whatIsWall);
+            isOnWall = overlapCircle;
         }
 
         private void SetGravityScale(float gravityScale)
