@@ -1,4 +1,6 @@
 using System;
+using Game.Code.AI;
+using Game.Code.Effects;
 using UnityEngine;
 
 namespace Game.Code.Character
@@ -12,6 +14,9 @@ namespace Game.Code.Character
         [SerializeField] private LayerMask whatIsWall;
         [Space]
         [SerializeField] private CharacterParams characterParams;
+        [Space]
+        [SerializeField] private Transform hitPoint;
+        [SerializeField] private LayerMask hittableLayer;
         
         private Rigidbody2D rb;
 
@@ -22,12 +27,16 @@ namespace Game.Code.Character
         private bool isOnGround, isOnWall;
         private bool wasInAir, wasSliding;
         private bool isDashing, isSliding;
+        private bool nextHitActive;
         private float dashDuration;
         private int jumpsAmount;
         private Vector2 dashDirection;
+        private AttackState attackState = AttackState.Default;
 
         public event Action OnJump;
         public event Action OnLand;
+
+        public Animator GetAnimator => animator;
         
         private static readonly int Horizontal = Animator.StringToHash("Horizontal");
         private static readonly int JumpUp = Animator.StringToHash("JumpUp");
@@ -37,6 +46,7 @@ namespace Game.Code.Character
         private static readonly int DashEnd = Animator.StringToHash("DashEnd");
         private static readonly int SlideStart = Animator.StringToHash("SlideStart");
         private static readonly int SlideEnd = Animator.StringToHash("SlideEnd");
+        private static readonly int Attack1 = Animator.StringToHash("Attack");
 
         private bool CanJump => isOnGround && rb.linearVelocityY < 0.1f;
         private bool CanAdditionalJump => !isOnGround && jumpsAmount > 0;
@@ -62,12 +72,18 @@ namespace Game.Code.Character
             Jump();
             Dash();
             Dashing();
+            Attack();
 
             GroundPointCheck();
             WallSlidePointCheck();
             
             TimersUpdate();
             ApplyGravity();
+
+            if (Input.GetKeyDown(KeyCode.R))
+            {
+                CameraShake.Instance.Shake(0.15f, 16, 0.8f, 17);
+            }
         }
 
         private void FixedUpdate()
@@ -83,6 +99,11 @@ namespace Game.Code.Character
         
         private void Movement()
         {
+            if (attackState is AttackState.Attacking or AttackState.Hit)
+            {
+                return;
+            }
+            
             var targetSpeed = inputData.Horizontal * characterParams.speed;
             targetSpeed = Mathf.Lerp(rb.linearVelocity.x, targetSpeed, 1f);
 
@@ -106,7 +127,7 @@ namespace Game.Code.Character
         
         private void Jump()
         {
-            if (!inputData.Jump || (!CanJump && !CanAdditionalJump))
+            if (!inputData.Jump || (!CanJump && !CanAdditionalJump) || attackState is AttackState.Attacking or AttackState.Hit)
             {
                 return;
             }
@@ -132,7 +153,7 @@ namespace Game.Code.Character
 
         private void Dash()
         {
-            if (!inputData.Dash || !CanDash)
+            if (!inputData.Dash || !CanDash || attackState is AttackState.Attacking or AttackState.Hit)
             {
                 return;
             }
@@ -171,6 +192,26 @@ namespace Game.Code.Character
             isSliding = true;
         }
 
+        private void Attack()
+        {
+            if (!inputData.Attack || attackState == AttackState.Attacking)
+            {
+                print("R1");
+                return;
+            }
+
+            if (attackState == AttackState.Hit)
+            {
+                print("R2");
+                nextHitActive = true;
+                return;
+            }
+
+            print("Attack start");
+            animator.SetTrigger(Attack1);
+            attackState = AttackState.Attacking;
+        }
+
         private void ApplyGravity()
         {
             if (isDashing)
@@ -185,6 +226,13 @@ namespace Game.Code.Character
                 wasSliding = true;
                 SetGravityScale(characterParams.gravityScale);
                 animator.SetTrigger(SlideStart);
+                return;
+            }
+
+            if (attackState is AttackState.Attacking or AttackState.Hit)
+            {
+                print("+");
+                rb.linearVelocity = new Vector2(0, 0);
                 return;
             }
 
@@ -227,7 +275,7 @@ namespace Game.Code.Character
             var overlapCircle = Physics2D.OverlapCircle(groundPoint.position, 0.1f, whatIsGround);
             isOnGround = overlapCircle;
         }
-        
+
         private void WallSlidePointCheck()
         {
             var overlapCircle = Physics2D.OverlapCircle(wallSlidePoint.position, 0.1f, whatIsWall);
@@ -245,6 +293,35 @@ namespace Game.Code.Character
                 return transform.right * DashDirection;
             
             return new Vector2(inputData.Horizontal, 0).normalized;
+        }
+
+        public void Hit()
+        {
+            var colliders = Physics2D.OverlapCircle(hitPoint.position, 0.5f, hittableLayer);
+            
+            if (colliders)
+            {
+                colliders.GetComponent<ImmortalEnemy>().SpawnImpact();
+            }
+
+            attackState = AttackState.Hit;
+            CameraShake.Instance.Shake(0.15f, 16, 0.8f, 17);
+        }
+
+        public void AttackEnd()
+        {
+            if (nextHitActive)
+            {
+                animator.ResetTrigger(Attack1);
+                animator.SetTrigger(Attack1);
+                attackState = AttackState.Attacking;
+                nextHitActive = false;
+                
+                return;
+            }
+            
+            print("Attack end");
+            attackState = AttackState.Default;
         }
     }
 }

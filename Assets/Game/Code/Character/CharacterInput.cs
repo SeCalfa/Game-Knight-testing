@@ -10,13 +10,15 @@ namespace Game.Code.Character
             var horizontal = Input.GetAxis("Horizontal");
             var jump = Input.GetKeyDown(KeyCode.Space);
             var dash = Input.GetKeyDown(KeyCode.LeftShift);
+            var attack = Input.GetKeyDown(KeyCode.Mouse0);
 
             // Return data
             return new InputData
             {
                 Horizontal = horizontal,
                 Jump = jump,
-                Dash = dash
+                Dash = dash,
+                Attack = attack
             };
         }
     }
@@ -26,5 +28,6 @@ namespace Game.Code.Character
         public float Horizontal;
         public bool Jump;
         public bool Dash;
+        public bool Attack;
     }
 }

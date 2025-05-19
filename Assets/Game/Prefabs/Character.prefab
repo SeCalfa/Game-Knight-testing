@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 5927285413997229754}
   - component: {fileID: 5433858604596120619}
   - component: {fileID: 3724362353546427002}
+  - component: {fileID: 8593826994942409164}
   m_Layer: 0
   m_Name: Model
   m_TagString: Untagged
@@ -76,7 +77,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 1
+  m_SortingOrder: 11
   m_Sprite: {fileID: 21300000, guid: 217a34da322f09a4f915f2ca6befab73, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -110,6 +111,19 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &8593826994942409164
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4778541929201133461}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c073352ebe003147b70d8b16e5fff19, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  characterMovement: {fileID: 2671341363925015092}
 --- !u!1 &5681459952444065584
 GameObject:
   m_ObjectHideFlags: 0
@@ -214,6 +228,7 @@ Transform:
   - {fileID: 5927285413997229754}
   - {fileID: 4574437347055126965}
   - {fileID: 7120567837827287986}
+  - {fileID: 8367163405397538557}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!70 &5977124829873810316
@@ -315,6 +330,10 @@ MonoBehaviour:
     dashDuration: 0.2
     dashResetTime: 0.5
     wallSlideSpeed: 1
+  hitPoint: {fileID: 8367163405397538557}
+  hittableLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!114 &1214565323167357494
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -331,6 +350,37 @@ MonoBehaviour:
   scaleLerpSpeed: 5
   jumpScale: {x: 0.9, y: 1.2}
   landScale: {x: 1.3, y: 0.8}
+--- !u!1 &7880910666774129599
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8367163405397538557}
+  m_Layer: 0
+  m_Name: HitPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8367163405397538557
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7880910666774129599}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.026, y: -0.4, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3884176421119127929}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8471289351019384261
 GameObject:
   m_ObjectHideFlags: 0
