@@ -27,7 +27,7 @@ namespace Game.Code.Character
         private bool isOnGround, isOnWall;
         private bool wasInAir, wasSliding;
         private bool isDashing, isSliding;
-        private bool nextHitActive;
+        private bool combo2, combo3;
         private float dashDuration;
         private int jumpsAmount;
         private Vector2 dashDirection;
@@ -47,6 +47,7 @@ namespace Game.Code.Character
         private static readonly int SlideStart = Animator.StringToHash("SlideStart");
         private static readonly int SlideEnd = Animator.StringToHash("SlideEnd");
         private static readonly int Attack1 = Animator.StringToHash("Attack");
+        private static readonly int End = Animator.StringToHash("AttackEnd");
 
         private bool CanJump => isOnGround && rb.linearVelocityY < 0.1f;
         private bool CanAdditionalJump => !isOnGround && jumpsAmount > 0;
@@ -99,7 +100,7 @@ namespace Game.Code.Character
         
         private void Movement()
         {
-            if (attackState is AttackState.Attacking or AttackState.Hit)
+            if (attackState is not AttackState.Default)
             {
                 return;
             }
@@ -127,7 +128,7 @@ namespace Game.Code.Character
         
         private void Jump()
         {
-            if (!inputData.Jump || (!CanJump && !CanAdditionalJump) || attackState is AttackState.Attacking or AttackState.Hit)
+            if (!inputData.Jump || (!CanJump && !CanAdditionalJump) || attackState is not AttackState.Default)
             {
                 return;
             }
@@ -153,7 +154,7 @@ namespace Game.Code.Character
 
         private void Dash()
         {
-            if (!inputData.Dash || !CanDash || attackState is AttackState.Attacking or AttackState.Hit)
+            if (!inputData.Dash || !CanDash || attackState is not AttackState.Default)
             {
                 return;
             }
@@ -194,22 +195,30 @@ namespace Game.Code.Character
 
         private void Attack()
         {
-            if (!inputData.Attack || attackState == AttackState.Attacking)
+            if (!inputData.Attack)
             {
-                print("R1");
                 return;
             }
 
-            if (attackState == AttackState.Hit)
+            if (attackState is AttackState.Attack1)
             {
-                print("R2");
-                nextHitActive = true;
+                combo2 = true;
+                return;
+            }
+            
+            if (attackState is AttackState.Attack2)
+            {
+                combo3 = true;
                 return;
             }
 
-            print("Attack start");
+            if (attackState is AttackState.Attack3)
+            {
+                return;
+            }
+
+            attackState = AttackState.Attack1;
             animator.SetTrigger(Attack1);
-            attackState = AttackState.Attacking;
         }
 
         private void ApplyGravity()
@@ -229,9 +238,8 @@ namespace Game.Code.Character
                 return;
             }
 
-            if (attackState is AttackState.Attacking or AttackState.Hit)
+            if (attackState is not AttackState.Default)
             {
-                print("+");
                 rb.linearVelocity = new Vector2(0, 0);
                 return;
             }
@@ -304,24 +312,28 @@ namespace Game.Code.Character
                 colliders.GetComponent<ImmortalEnemy>().SpawnImpact();
             }
 
-            attackState = AttackState.Hit;
+            // attackState = state;
             CameraShake.Instance.Shake(0.15f, 16, 0.8f, 17);
         }
 
-        public void AttackEnd()
+        public void AttackEnd(AttackState state)
         {
-            if (nextHitActive)
+            if (state is AttackState.Attack1 && combo2)
             {
-                animator.ResetTrigger(Attack1);
-                animator.SetTrigger(Attack1);
-                attackState = AttackState.Attacking;
-                nextHitActive = false;
-                
+                attackState = AttackState.Attack2;
                 return;
             }
-            
-            print("Attack end");
+
+            if (state is AttackState.Attack2 && combo3)
+            {
+                attackState = AttackState.Attack3;
+                return;
+            }
+
+            combo2 = false;
+            combo3 = false;
             attackState = AttackState.Default;
+            animator.SetTrigger(End);
         }
     }
 }

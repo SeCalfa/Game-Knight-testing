@@ -5,18 +5,25 @@ namespace Game.Code.Character
     public class CharacterModel : MonoBehaviour
     {
         [SerializeField] private CharacterMovement characterMovement;
-        
-        private static readonly int End = Animator.StringToHash("AttackEnd");
 
         private void Hit()
         {
             characterMovement.Hit();
         }
-        
-        private void AttackEnd()
+
+        private void Attack1End()
         {
-            characterMovement.GetAnimator.SetTrigger(End);
-            characterMovement.AttackEnd();
+            characterMovement.AttackEnd(AttackState.Attack1);
+        }
+        
+        private void Attack2End()
+        {
+            characterMovement.AttackEnd(AttackState.Attack2);
+        }
+        
+        private void Attack3End()
+        {
+            characterMovement.AttackEnd(AttackState.Attack3);
         }
     }
 }
