@@ -1,177 +1,90 @@
-using UnityEngine;
 using System.Collections.Generic;
-using System;
+using UnityEngine;
 
-namespace Game.Code.Enemy
+namespace Game.Code.EnemyLogic
 {
     public class Butterflies : MonoBehaviour
     {
         [Header("Movement")]
-        [SerializeField] private List<Transform> waypoints;
-        [SerializeField] private float moveSpeed = 2f;
-        [SerializeField] private float waypointReachedDistance = 0.1f;
-        [SerializeField] private bool loopPath = true;
-        [SerializeField] private float slowdownDistance = 1f; // Distance to start slowing down
+        [SerializeField] private List<Transform> wayPoints;
+        [SerializeField] private float moveSpeed;
+        [Space]
+        [SerializeField] private bool loopPath;
 
-        [Header("Damage")]
-        [SerializeField] private string playerTag = "Player";
-
-        private int currentWaypointIndex = 0;
-        private bool movingForward = true;
         private Rigidbody2D rb;
-
-        public event Action OnDamageDealt;
+        
+        private Transform currentTarget;
+        private int currentTargetIndex;
+        private Vector2 direction;
 
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
-            rb.bodyType = RigidbodyType2D.Kinematic;
             rb.gravityScale = 0f;
-        }
 
-        private void Start()
-        {
-            if (waypoints == null || waypoints.Count == 0)
+            foreach (var point in wayPoints)
             {
-                Debug.LogWarning("No waypoints assigned to butterfly enemy!");
-                // Disable the script if no waypoints are assigned to prevent errors
-                enabled = false;
-                return;
+                point.parent = null;
             }
 
-            Collider2D collider = GetComponent<Collider2D>();
-            if (collider == null)
-                Debug.LogError("No Collider2D component found on Butterflies GameObject!");
-            else if (!collider.isTrigger)
-            {
-                Debug.LogWarning("Converting Collider2D to Trigger for kinematic body interactions!");
-                collider.isTrigger = true;
-            }
-        }
-
-        private void Update()
-        {
-            // Removed obstacle detection and gradual rotation calls
+            currentTarget = wayPoints[currentTargetIndex];
         }
 
         private void FixedUpdate()
         {
-            MoveAlongPathKinematic();
+            Movement();
         }
 
-        private void MoveAlongPathKinematic()
+        private void Movement()
         {
-            if (waypoints == null || waypoints.Count == 0 || !enabled)
-                return;
+            var newPosition = Vector2.MoveTowards(rb.position, currentTarget.position, moveSpeed * Time.fixedDeltaTime);
+            rb.MovePosition(newPosition);
 
-            Transform targetWaypoint = waypoints[currentWaypointIndex];
-            if (targetWaypoint == null)
+            if (Vector2.Distance(rb.position, currentTarget.position) < 0.1f)
             {
-                Debug.LogWarning($"Waypoint {currentWaypointIndex} is null. Skipping movement.");
-                SelectNextWaypoint(); // Try to move to the next waypoint
-                return;
-            }
-
-            Vector2 currentPos = rb.position;
-            Vector2 waypointPos = targetWaypoint.position;
-            Vector2 directionToWaypoint = (waypointPos - currentPos).normalized;
-            float distanceToWaypoint = Vector2.Distance(currentPos, waypointPos);
-
-            if (distanceToWaypoint <= waypointReachedDistance)
-            {
-                SelectNextWaypoint();
-                if (!enabled) return; 
-                targetWaypoint = waypoints[currentWaypointIndex];
-                if (targetWaypoint == null)
+                // Next target index
+                currentTargetIndex += 1;
+                if (currentTargetIndex == wayPoints.Count)
                 {
-                     Debug.LogWarning($"Next waypoint {currentWaypointIndex} is null after selection. Skipping movement.");
-                     enabled = false; // Or handle differently, e.g., stop moving
-                     return;
+                    currentTargetIndex = 0;
                 }
-                waypointPos = targetWaypoint.position;
-                directionToWaypoint = (waypointPos - currentPos).normalized;
-                distanceToWaypoint = Vector2.Distance(currentPos, waypointPos);
-            }
 
-            float currentMoveSpeed = moveSpeed;
-            // Slow down if approaching the waypoint
-            if (distanceToWaypoint < slowdownDistance)
-            {
-                
-                currentMoveSpeed = Mathf.Lerp(moveSpeed * 0.2f, moveSpeed, distanceToWaypoint / slowdownDistance);
-                currentMoveSpeed = Mathf.Max(currentMoveSpeed, moveSpeed * 0.1f); // Ensure a minimum speed
-            }
-            
-            Vector2 velocity = directionToWaypoint * currentMoveSpeed;
-            rb.MovePosition(currentPos + velocity * Time.fixedDeltaTime);
-        }
+                // Next target
+                currentTarget = wayPoints[currentTargetIndex];
 
-        private void SelectNextWaypoint()
-        {
-            if (loopPath)
-            {
-                currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Count;
-            }
-            else
-            {
-                if (movingForward)
-                {
-                    currentWaypointIndex++;
-                    if (currentWaypointIndex >= waypoints.Count) 
-                    {
-                        currentWaypointIndex = waypoints.Count - 1; // Stay at the last waypoint
-                        movingForward = false;
-                        // disable movement if it should stop at the end
-                        // enabled = false; 
-                        Debug.Log("Reached end of non-looping path (forward).");
-                    }
-                }
-                else
-                {
-                    currentWaypointIndex--;
-                    if (currentWaypointIndex < 0)
-                    {
-                        currentWaypointIndex = 0; // Stay at the first waypoint
-                        movingForward = true;
-                        // disable movement if it should stop at the end
-                        // enabled = false;
-                        Debug.Log("Reached end of non-looping path (backward).");
-                    }
-                }
+                //Watch direction
+                WatchDirection();
             }
         }
 
-        private void OnTriggerEnter2D(Collider2D collision)
+        private void WatchDirection()
         {
-            if (collision.CompareTag(playerTag))
-            {
-                Debug.Log("Butterflies deal damage to player!");
-                OnDamageDealt?.Invoke();
-            }
+            direction = (Vector2)currentTarget.position - rb.position;
+            transform.localScale = new Vector3((direction.x < 0) ? -1 : 1, 1, 1);
         }
 
         private void OnDrawGizmosSelected()
         {
-            if (waypoints != null && waypoints.Count > 0)
+            if (wayPoints is not { Count: > 0 }) return;
+            
+            Gizmos.color = Color.cyan;
+            
+            for (var i = 0; i < wayPoints.Count; i++)
             {
-                Gizmos.color = Color.cyan;
-                for (int i = 0; i < waypoints.Count; i++)
+                if (wayPoints[i] == null) continue;
+                
+                var pos = wayPoints[i].position;
+                Gizmos.DrawSphere(pos, 0.2f);
+                
+                if (loopPath)
                 {
-                    if (waypoints[i] != null)
-                    {
-                        Vector3 pos = waypoints[i].position;
-                        Gizmos.DrawSphere(pos, 0.2f);
-                        if (loopPath)
-                        {
-                            if (waypoints[(i + 1) % waypoints.Count] != null)
-                                Gizmos.DrawLine(pos, waypoints[(i + 1) % waypoints.Count].position);
-                        }
-                        else
-                        {
-                            if (i < waypoints.Count - 1 && waypoints[i + 1] != null)
-                                Gizmos.DrawLine(pos, waypoints[i + 1].position);
-                        }
-                    }
+                    if (wayPoints[(i + 1) % wayPoints.Count] != null)
+                        Gizmos.DrawLine(pos, wayPoints[(i + 1) % wayPoints.Count].position);
+                }
+                else
+                {
+                    if (i < wayPoints.Count - 1 && wayPoints[i + 1] != null)
+                        Gizmos.DrawLine(pos, wayPoints[i + 1].position);
                 }
             }
         }
